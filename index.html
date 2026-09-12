@@ -1,0 +1,1408 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<meta charset="utf-8">
+<title>Pelacak Log OCPP</title>
+<style>
+/* ============================================================
+   Palette & tipografi mengikuti tssa.space / aplikasi reimbursement
+   ============================================================ */
+:root{
+  --blue:      #0c45e8;
+  --blue-band: #0b3df2;
+  --blue-deep: #0a33c9;
+  --ink:       #0d0d0d;
+  --paper:     #ece2ce;
+  --paper-line:#ddd2bb;
+  --gray:      #f5f5f5;
+  --muted:     #6f7177;
+  --muted-2:   #9a9ca2;
+
+  --card:   #ffffff;
+  --line:   #e6e6e6;
+  --line-2: #f0f0f0;
+  --hover:  #fafafa;
+  --danger: #c0392b;
+  --danger-line:#e3c4c0;
+
+  --text:   var(--ink);
+  --accent: var(--blue);
+  --radius: 4px;
+  --sans: Helvetica, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{
+  margin:0; background:var(--gray); color:var(--text);
+  font:15px/1.5 var(--sans);
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+}
+.mono{font-family:var(--mono)}
+h1,h2,h3{margin:0; text-wrap:balance}
+button,input,select,textarea{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
+/* ---------- bar atas ---------- */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+  padding:16px var(--tp,24px); background:var(--card); border-bottom:1px solid var(--line);
+}
+.wordmark{font-size:22px; font-weight:700; letter-spacing:-0.02em; color:var(--ink)}
+.wordmark b{color:var(--blue); font-weight:700}
+.tagline{color:var(--muted); font-size:14px; max-width:58ch}
+.topbar .spacer{flex:1 1 auto}
+.badge-proto{
+  font-size:11px; font-weight:600; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--blue); border:1px solid var(--blue); border-radius:var(--radius);
+  padding:4px 9px; white-space:nowrap;
+}
+
+/* ---------- kerangka ---------- */
+.shell{display:grid; grid-template-columns:400px minmax(0,1fr); align-items:start}
+@media (max-width:1080px){ .shell{grid-template-columns:1fr} }
+
+.rail{
+  background:var(--card); border-right:1px solid var(--line);
+  position:sticky; top:var(--topH,74px); height:calc(100vh - var(--topH,74px));
+  overflow-y:auto; overscroll-behavior:contain;
+  display:flex; flex-direction:column;
+}
+.rail .dlbar{margin-top:auto}
+@media (max-width:1080px){
+  .rail{position:static; height:auto; border-right:0; border-bottom:1px solid var(--line)}
+}
+
+.panel{border-bottom:1px solid var(--line); padding:20px 24px}
+.panel > h2{
+  font-size:12px; font-weight:600; letter-spacing:.24em; text-transform:uppercase;
+  color:var(--muted); display:flex; align-items:center; gap:8px; margin-bottom:16px;
+}
+.panel > h2 .n{color:var(--blue); font-variant-numeric:tabular-nums; letter-spacing:.08em}
+.stack{display:flex; flex-direction:column; gap:12px}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.hint{font-size:13px; color:var(--muted); line-height:1.45}
+
+/* ---------- kontrol ---------- */
+label.fld{display:grid; gap:6px; font-size:13px; color:var(--muted)}
+input[type=text],input[type=number],select{
+  font:inherit; color:var(--text); background:var(--card);
+  border:1px solid var(--line); border-radius:var(--radius);
+  padding:8px 10px; width:100%; min-width:0;
+}
+input:focus,select:focus{outline:2px solid var(--accent); outline-offset:-1px}
+input.bad{border-color:var(--danger)}
+input[type=number],#fromTime,#toTime{font-variant-numeric:tabular-nums}
+select{appearance:none; padding-right:28px}
+.selwrap{position:relative}
+.selwrap::after{
+  content:""; position:absolute; right:11px; top:50%; margin-top:-2px; pointer-events:none;
+  border:4px solid transparent; border-top-color:var(--muted);
+}
+
+.check{display:flex; gap:10px; align-items:flex-start; cursor:pointer; padding:2px 0; font-size:14px}
+.check input{margin:3px 0 0; accent-color:var(--blue); width:15px; height:15px; flex:none}
+.check .t{flex:1 1 auto; min-width:0}
+.check .t small{display:block; color:var(--muted); font-size:12px; margin-top:1px}
+
+.switch{
+  display:flex; align-items:flex-start; gap:11px; cursor:pointer;
+  background:var(--card); border:1px solid var(--line); border-left-width:3px;
+  border-radius:var(--radius); padding:11px 13px;
+}
+.switch input{accent-color:var(--blue); width:16px; height:16px; margin:3px 0 0; flex:none}
+.switch strong{font-size:14px; font-weight:600; display:block}
+.switch small{color:var(--muted); font-size:12px}
+.switch:has(input:checked){border-color:var(--blue)}
+
+fieldset{border:0; margin:0; padding:0}
+.sub{
+  margin-top:12px; padding:14px; border:1px dashed var(--line);
+  border-radius:var(--radius); display:flex; flex-direction:column; gap:9px;
+}
+.sub legend{font-size:12px; color:var(--muted); padding:0 6px; letter-spacing:.08em; text-transform:uppercase}
+
+/* daftar command */
+.cmdlist{border:1px solid var(--line); border-radius:var(--radius); overflow:hidden}
+.cmdrow{display:flex; align-items:center; gap:10px; padding:8px 11px; cursor:pointer; border-bottom:1px solid var(--line-2)}
+.cmdrow:last-child{border-bottom:0}
+.cmdrow:hover{background:var(--hover)}
+.cmdrow input{accent-color:var(--blue); width:15px; height:15px; margin:0; flex:none}
+.cmdrow .nm{flex:1 1 auto; font-size:14px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cmdrow:has(input:not(:checked)) .nm{color:var(--muted-2); text-decoration:line-through; text-decoration-thickness:1px}
+.cmdrow .ct{font-family:var(--mono); font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums}
+.kind{width:3px; align-self:stretch; flex:none; background:var(--line)}
+.k-tx{background:var(--blue)} .k-stop{background:var(--danger)}
+.k-mv{background:var(--paper-line)} .k-sys{background:var(--muted-2)}
+
+.minibtns{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+.minibtn{
+  font:inherit; font-size:13px; background:var(--card); color:var(--muted);
+  border:1px solid var(--line); border-radius:var(--radius); padding:6px 12px; cursor:pointer;
+}
+.minibtn:hover{color:var(--ink); border-color:var(--ink)}
+
+/* chip pilihan */
+.chips{display:flex; flex-wrap:wrap; gap:7px}
+.chip{
+  display:inline-flex; align-items:center; cursor:pointer; font-size:13px;
+  font-family:var(--mono); color:var(--muted);
+  border:1px solid var(--line); background:var(--card);
+  border-radius:var(--radius); padding:5px 11px;
+}
+.chip:hover{color:var(--ink); border-color:var(--ink)}
+.chip input{display:none}
+.chip:has(input:checked){background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600}
+.chip.mini{font-size:12px; padding:4px 9px; font-family:var(--sans)}
+
+/* unggah */
+.drop{
+  border:1px dashed var(--line); border-radius:var(--radius); background:var(--card);
+  padding:26px 16px; text-align:center; cursor:pointer;
+}
+.drop:hover,.drop.over{border-color:var(--blue); background:var(--hover)}
+.drop .big{font-weight:600; font-size:15px}
+.drop .sm{color:var(--muted); font-size:13px; margin-top:4px}
+.drop svg{display:block; margin:0 auto 10px; color:var(--blue)}
+
+.srcinfo{
+  background:var(--paper); border:1px solid var(--paper-line); border-radius:var(--radius);
+  padding:13px 14px; display:flex; flex-direction:column; gap:10px;
+}
+.srcinfo .fname{font-weight:700; font-size:14px; word-break:break-all}
+.meta{display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:13px; margin:0}
+.meta dt{color:#6b6353}
+.meta dd{margin:0; font-family:var(--mono); font-size:12px; font-variant-numeric:tabular-nums; word-break:break-word}
+
+/* aturan lanjutan */
+details.adv{margin-top:4px}
+details.adv > summary{
+  cursor:pointer; font-size:13px; color:var(--muted); padding:7px 0;
+  list-style:none; display:flex; align-items:center; gap:7px;
+}
+details.adv > summary::-webkit-details-marker{display:none}
+details.adv > summary::before{content:"+"; color:var(--muted-2); font-size:13px; width:9px}
+details.adv[open] > summary::before{content:"–"}
+details.adv > summary:hover{color:var(--ink)}
+.rules{width:100%; min-width:450px; border-collapse:collapse; font-size:12px; margin-top:8px; color:var(--text); font-family:inherit}
+.rules td input{min-width:104px}
+.rules td select{min-width:116px}
+.rules th{
+  text-align:left; font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); padding:0 4px 6px;
+}
+.rules td{padding:2px; vertical-align:top}
+.rules input,.rules select{padding:5px 7px; font-size:12px}
+.rules .cmdname{font-family:var(--mono); font-size:11px; padding-top:10px; white-space:nowrap; color:var(--muted)}
+
+/* ---------- area utama ---------- */
+.main{min-width:0; padding:24px var(--tp,24px) 60px}
+.statstrip{display:flex; flex-wrap:wrap; gap:0; margin-bottom:20px; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); overflow:hidden}
+.stat{padding:12px 18px; min-width:118px; border-right:1px solid var(--line); flex:1 1 auto}
+.stat:last-child{border-right:0}
+.stat .v{font-size:24px; font-weight:700; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; line-height:1.1}
+.stat .l{font-size:11px; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; font-weight:600; margin-top:4px}
+.stat.out .v{color:var(--blue)}
+.stat.cut .v{color:var(--muted)}
+
+.sheetwrap{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden}
+.sheethead{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:13px 16px; border-bottom:1px solid var(--line);
+}
+.sheethead h3{font-size:14px; font-weight:700; letter-spacing:-0.01em}
+.sheethead .spacer{flex:1 1 auto}
+.tablescroll{overflow:auto; max-height:calc(100vh - 300px)}
+table.preview{border-collapse:collapse; width:100%; font-size:13px; color:var(--text); font-family:inherit}
+table.preview thead th{
+  position:sticky; top:0; z-index:2; background:var(--gray);
+  text-align:left; padding:8px 10px; font-size:12px; font-weight:600;
+  letter-spacing:.04em; text-transform:uppercase; color:var(--ink);
+  border:1px solid var(--line); white-space:nowrap;
+}
+table.preview td{padding:7px 10px; border:1px solid var(--line); vertical-align:top}
+table.preview tbody tr:hover td{background:var(--hover)}
+td.t-time{font-family:var(--mono); font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--muted); width:1%}
+td.t-uuid{font-family:var(--mono); font-size:11px; color:var(--muted-2); white-space:nowrap; width:1%}
+td.t-cmd{white-space:nowrap; width:1%; font-weight:600; font-size:13px}
+td.t-cmd .dot{display:inline-block; width:7px; height:7px; margin-right:8px; vertical-align:1px; background:var(--line)}
+td.t-cmd .dot.k-tx{background:var(--blue)}
+td.t-cmd .dot.k-stop{background:var(--danger)}
+td.t-cmd .dot.k-mv{background:var(--paper-line)}
+td.t-cmd .dot.k-sys{background:var(--muted-2)}
+td.t-pay{font-family:var(--mono); font-size:12px; color:var(--text); word-break:break-word; min-width:320px; line-height:1.5}
+td.t-pay .arrow{color:var(--blue); font-weight:700; padding:0 4px}
+td.t-pay .tag{color:var(--muted)}
+tr.anchor td.t-time{color:var(--ink); font-weight:700}
+.anchortag{
+  display:inline-block; margin-left:9px; font-size:10px; font-family:var(--sans);
+  font-weight:600; letter-spacing:.12em; text-transform:uppercase;
+  padding:1px 5px; border-radius:2px; vertical-align:1px;
+  border:1px solid var(--blue); color:var(--blue);
+}
+.anchortag.s{border-color:var(--danger); color:var(--danger)}
+.gaprow td{
+  padding:5px 10px; background:var(--paper); color:#5f5748; border:1px solid var(--paper-line);
+  font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:600;
+}
+
+.empty{padding:80px 24px; text-align:center; color:var(--muted)}
+.empty .big{font-size:17px; color:var(--ink); font-weight:700; letter-spacing:-0.01em; margin-bottom:8px}
+
+/* ---------- unduh ---------- */
+.dlbar{
+  position:sticky; bottom:0; z-index:15; display:flex; gap:12px; align-items:flex-end;
+  padding:16px 24px; background:var(--card); border-top:1px solid var(--line);
+}
+.btn{
+  font:inherit; border:0; border-radius:var(--radius); cursor:pointer;
+  background:var(--blue); color:#fff; padding:11px 18px; font-weight:600; white-space:nowrap;
+}
+.btn:hover:not(:disabled){background:var(--blue-deep)}
+.btn:disabled{opacity:.55; cursor:progress}
+.btn.ghost{background:var(--card); color:var(--muted); border:1px solid var(--line); font-weight:400}
+.btn.ghost:hover{background:var(--card); color:var(--ink); border-color:var(--ink)}
+
+.toast{
+  position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(8px);
+  background:var(--ink); color:#fff; padding:11px 18px; border-radius:var(--radius);
+  font-size:14px; font-weight:600; opacity:0; pointer-events:none;
+  transition:opacity .2s, transform .2s; z-index:50;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+.err{border:1px solid var(--danger); border-left-width:3px; border-radius:var(--radius); color:var(--danger); padding:12px 13px; font-size:13px; background:var(--card)}
+
+@media (max-width:1080px){ :root{--tp:20px} }
+@media (max-width:640px){
+  :root{--tp:14px}
+  body{font-size:15px}
+  .row2{grid-template-columns:1fr}
+  .panel{padding:18px 16px}
+  .dlbar{padding:14px 16px}
+  input,select{font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} }
+</style>
+
+
+<div class="topbar">
+  <div class="wordmark">Pelacak Log <b>OCPP</b></div>
+  <div class="tagline">Ubah ekspor CSV dari CSMS jadi tabel laporan siap tempel — pilih command yang tampil, ringkas MeterValues, unduh XLSX.</div>
+  <div class="spacer"></div>
+  <span class="badge-proto">OCPP 1.6J</span>
+</div>
+
+<div class="shell">
+<!-- ================= RAIL ================= -->
+<aside class="rail">
+
+  <section class="panel">
+    <h2>Sumber</h2>
+    <div id="dropzone" class="drop" tabindex="0" role="button" aria-label="Pilih atau jatuhkan file CSV">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      <div class="big">Jatuhkan CSV log di sini</div>
+      <div class="sm">atau klik untuk memilih file</div>
+    </div>
+    <input type="file" id="fileinput" accept=".csv,text/csv" hidden>
+    <div id="srcinfo" class="srcinfo" style="margin-top:10px" hidden></div>
+    <div id="srcerr" class="err" style="margin-top:10px" hidden></div>
+  </section>
+
+  <section class="panel" id="scopePanel" hidden>
+    <h2>Lingkup</h2>
+    <div class="stack">
+      <div class="row2">
+        <label class="fld">Zona waktu keluaran
+          <span class="selwrap"><select id="tzoffset">
+            <option value="0">UTC+0</option>
+            <option value="420">UTC+7 (WIB)</option>
+            <option value="480" selected>UTC+8 (WITA)</option>
+            <option value="540">UTC+9 (WIT)</option>
+          </select></span>
+        </label>
+        <label class="fld">Format waktu
+          <span class="selwrap"><select id="timefmt">
+            <option value="hms" selected>10:35:29</option>
+            <option value="hmsms">10:35:29.298</option>
+            <option value="full">2026-09-12 10:35:29</option>
+          </select></span>
+        </label>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom:6px">Rentang waktu</div>
+        <div class="row2">
+          <label class="fld">Dari
+            <input type="text" id="fromTime" spellcheck="false" placeholder="mis. 10:36:00">
+          </label>
+          <label class="fld">Sampai
+            <input type="text" id="toTime" spellcheck="false" placeholder="mis. 10:39:30">
+          </label>
+        </div>
+        <div class="minibtns">
+          <button class="minibtn" id="rangeAll">Seluruh log</button>
+          <button class="minibtn" id="rangeTx">Pas ke transaksi</button>
+        </div>
+        <div class="hint" id="rangeHint" style="margin-top:6px"></div>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom:6px">Connector</div>
+        <div class="chips" id="connChips"></div>
+      </div>
+      <div id="txWrap">
+        <div class="hint" style="margin-bottom:6px">Transaction ID</div>
+        <div class="chips" id="txChips"></div>
+      </div>
+      <div class="hint">Baris tanpa connector (Heartbeat, Authorize, Disconnect) selalu ikut selama command-nya tidak disembunyikan.</div>
+    </div>
+  </section>
+
+  <section class="panel" id="cmdPanel" hidden>
+    <h2>Command <span class="n" id="cmdCount"></span></h2>
+    <div class="cmdlist" id="cmdList"></div>
+    <div class="minibtns">
+      <button class="minibtn" data-preset="all">Semua</button>
+      <button class="minibtn" data-preset="none">Kosongkan</button>
+      <button class="minibtn" data-preset="report">Preset laporan</button>
+    </div>
+    <div class="hint" style="margin-top:8px">Preset laporan menyembunyikan Heartbeat dan menyalakan sisanya.</div>
+  </section>
+
+  <section class="panel" id="mvPanel" hidden>
+    <h2>MeterValues</h2>
+    <label class="switch">
+      <input type="checkbox" id="mvFilter" checked>
+      <span class="t"><strong>Ringkas jadi titik penting</strong>
+      <small>Buang sampel periodik, sisakan yang mengapit transaksi</small></span>
+    </label>
+    <fieldset class="sub" id="mvOpts">
+      <legend>Titik yang disimpan</legend>
+      <label class="check"><input type="checkbox" id="mvAfterStart" checked><span class="t">Setelah <b>StartTransaction</b><small>sampel pertama begitu sesi mulai</small></span></label>
+      <label class="check"><input type="checkbox" id="mvBeforeStop" checked><span class="t">Sebelum <b>StopTransaction</b><small>sampel terakhir sebelum sesi ditutup</small></span></label>
+      <label class="check"><input type="checkbox" id="mvAfterStop" checked><span class="t">Setelah <b>StopTransaction</b><small>sampel yang masih masuk setelah stop</small></span></label>
+      <label class="fld" style="margin-top:4px">Jumlah sampel per titik
+        <input type="number" id="mvCount" value="1" min="1" max="20" step="1">
+      </label>
+      <label class="check"><input type="checkbox" id="mvNoStopTail" checked><span class="t">Tanpa StopTransaction, ambil sampel terakhir<small>log yang terputus tetap punya nilai penutup</small></span></label>
+    </fieldset>
+    <div class="hint" style="margin-top:12px; margin-bottom:6px">Measurand yang ditulis ke payload</div>
+    <div class="chips" id="measChips"></div>
+    <div class="stack" style="margin-top:10px">
+      <label class="check"><input type="checkbox" id="mvUnit"><span class="t">Sertakan satuan (unit)</span></label>
+      <label class="check"><input type="checkbox" id="mvTs"><span class="t">Sertakan timestamp meterValue</span></label>
+      <label class="check"><input type="checkbox" id="mvCtx" checked><span class="t">Tandai konteks sampel<small>misalnya <span class="mono">*(Sampling)*</span> di akhir payload</small></span></label>
+    </div>
+  </section>
+
+  <section class="panel" id="payPanel" hidden>
+    <h2>Payload &amp; kolom</h2>
+    <div class="stack">
+      <div class="row2">
+        <label class="fld">Gaya payload
+          <span class="selwrap"><select id="payMode">
+            <option value="ringkas" selected>Ringkas (laporan)</option>
+            <option value="lengkap">Lengkap (raw)</option>
+          </select></span>
+        </label>
+        <label class="fld">Kolom UUID
+          <span class="selwrap"><select id="uuidMode">
+            <option value="short" selected>Pendek</option>
+            <option value="full">Penuh</option>
+            <option value="off">Tanpa kolom UUID</option>
+          </select></span>
+        </label>
+      </div>
+      <label class="check"><input type="checkbox" id="optTick" checked><span class="t">Bungkus payload dengan backtick<small>gaya Markdown, seperti file acuan</small></span></label>
+      <label class="check"><input type="checkbox" id="optMergeRes" checked><span class="t">Gabungkan response ke baris request<small>CALLRESULT tidak jadi baris sendiri</small></span></label>
+      <label class="check"><input type="checkbox" id="optErr" checked><span class="t">Tampilkan errorCode kalau bukan NoError</span></label>
+      <label class="check"><input type="checkbox" id="optReason" checked><span class="t">Pendekkan teks reason<small>buang keterangan dalam tanda kurung</small></span></label>
+
+      <details class="adv">
+        <summary>Aturan ringkas per command</summary>
+        <div class="hint">Daftar field yang ikut, dipisah koma. Pakai titik untuk field bersarang (<span class="mono">data.brmVin</span>), dan <span class="mono">*</span> untuk semua field.</div>
+        <div style="overflow-x:auto">
+        <table class="rules"><thead><tr>
+          <th style="width:1%">Command</th><th>Field request</th><th>Field response</th><th style="width:1%">Response</th>
+        </tr></thead><tbody id="rulesBody"></tbody></table>
+        </div>
+        <button class="minibtn" id="rulesReset" style="margin-top:8px">Kembalikan ke bawaan</button>
+      </details>
+    </div>
+  </section>
+
+  <div class="dlbar" id="dlbar" hidden>
+    <label class="fld" style="flex:1 1 auto">Nama file
+      <input type="text" id="outname" spellcheck="false">
+    </label>
+    <button class="btn" id="dlbtn">Unduh XLSX</button>
+  </div>
+</aside>
+
+<!-- ================= MAIN ================= -->
+<main class="main">
+  <div class="statstrip" id="statstrip" hidden>
+    <div class="stat"><div class="v" id="stIn">0</div><div class="l">Baris CSV</div></div>
+    <div class="stat"><div class="v" id="stMsg">0</div><div class="l">Pesan OCPP</div></div>
+    <div class="stat out"><div class="v" id="stOut">0</div><div class="l">Baris keluar</div></div>
+    <div class="stat cut"><div class="v" id="stMv">0</div><div class="l">MeterValues dibuang</div></div>
+    <div class="stat"><div class="v" id="stHide">0</div><div class="l">Command disembunyikan</div></div>
+  </div>
+
+  <div class="sheetwrap">
+    <div class="sheethead">
+      <h3 id="sheetTitle">Pratinjau hasil</h3>
+      <div class="spacer"></div>
+      <label class="chip mini"><input type="checkbox" id="showAnchors" checked>tanda titik transaksi</label>
+      <span class="hint mono" id="previewNote"></span>
+    </div>
+    <div class="tablescroll">
+      <table class="preview" id="preview">
+        <thead><tr id="previewHead"></tr></thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+      <div class="empty" id="emptyState">
+        <div class="big">Belum ada log yang dimuat</div>
+        <div>Pilih file CSV ekspor CSMS di panel kiri. Semua proses berjalan di browser ini — file tidak dikirim ke mana pun.</div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   Pelacak Log OCPP — konversi CSV log CSMS ke tabel XLSX
+   Semua proses lokal di browser. Tanpa dependensi eksternal.
+   ============================================================ */
+
+/* ---------- util ---------- */
+const $ = (id) => document.getElementById(id);
+const jsonc = (v) => JSON.stringify(v);
+const deep = (v) => (v == null ? v : JSON.parse(JSON.stringify(v)));
+const pad = (n, w = 2) => String(n).padStart(w, "0");
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ---------- CSV (RFC 4180) ---------- */
+function parseCsv(text) {
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  const rows = []; let row = []; let field = ""; let q = false; let started = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += c;
+    } else if (c === '"') { q = true; started = true; }
+    else if (c === ",") { row.push(field); field = ""; started = false; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = ""; started = false;
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== "" || started || row.length) { row.push(field); if (row.length > 1 || row[0] !== "") rows.push(row); }
+  if (!rows.length) return { headers: [], records: [] };
+  const headers = rows[0].map((h) => h.trim());
+  const records = rows.slice(1).map((r) => {
+    const o = {};
+    headers.forEach((h, i) => { o[h] = r[i] !== undefined ? r[i] : ""; });
+    return o;
+  });
+  return { headers, records };
+}
+
+/* ---------- normalisasi pesan OCPP ---------- */
+const NULLS = new Set(["", "null", "NULL", "undefined", "-"]);
+const nz = (v) => (v == null || NULLS.has(String(v).trim()) ? null : String(v).trim());
+
+function parseJsonish(s) {
+  const v = nz(s); if (v === null) return null;
+  try { return JSON.parse(v); } catch (_) { return null; }
+}
+
+function payloadOf(rec) {
+  const p = parseJsonish(rec.payload);
+  const full = p && typeof p === "object" && !Array.isArray(p) && Object.keys(p).length;
+  if (full) return p;
+  const raw = parseJsonish(rec.payload_raw);
+  if (Array.isArray(raw)) {
+    const mt = Number(raw[0]);
+    if (mt === 2) return raw[3] && typeof raw[3] === "object" ? raw[3] : {};
+    if (mt === 3) return raw[2] && typeof raw[2] === "object" ? raw[2] : {};
+    if (mt === 4) return { errorCode: raw[2], errorDescription: raw[3], errorDetails: raw[4] };
+    return {};
+  }
+  if (raw && typeof raw === "object") return raw;
+  return p && typeof p === "object" ? p : {};
+}
+
+function connectorOf(payload, rec) {
+  if (payload) {
+    if (payload.connectorId != null) return String(payload.connectorId);
+    if (payload.data && payload.data.Connector != null) return String(payload.data.Connector);
+    if (payload.data && payload.data.connectorId != null) return String(payload.data.connectorId);
+  }
+  return nz(rec.connector_number);
+}
+
+function normalize(records) {
+  const items = [];
+  for (const rec of records) {
+    const iso = nz(rec.created_at); if (!iso) continue;
+    const t = new Date(iso); if (isNaN(t)) continue;
+    const payload = payloadOf(rec);
+    items.push({
+      t, iso,
+      command: nz(rec.command) || "(tanpa command)",
+      messageId: nz(rec.message_id),
+      messageType: nz(rec.message_type),
+      sendBy: nz(rec.send_by),
+      serial: nz(rec.serial_number),
+      connector: connectorOf(payload, rec),
+      payload, res: null, anchor: null,
+    });
+  }
+  items.sort((a, b) => a.t - b.t || a.iso.localeCompare(b.iso));
+  return items;
+}
+
+function pairMessages(all, mergeRes) {
+  const out = []; const open = new Map();
+  for (const it of all) {
+    const isRes = it.messageType === "3" || it.messageType === "4";
+    if (isRes) {
+      const call = it.messageId ? open.get(it.messageId) : null;
+      if (mergeRes && call) { call.res = it; continue; }
+      it.kind = "result"; out.push(it); continue;
+    }
+    it.kind = "call";
+    if (it.messageId) open.set(it.messageId, it);
+    out.push(it);
+  }
+  return out;
+}
+
+function txOf(it) {
+  if (it.command === "StartTransaction") {
+    const r = it.res && it.res.payload;
+    return r && r.transactionId != null ? String(r.transactionId) : null;
+  }
+  if (it.payload && it.payload.transactionId != null) return String(it.payload.transactionId);
+  return null;
+}
+
+/* ---------- sesi transaksi: anchor untuk filter MeterValues ---------- */
+function buildSessions(items) {
+  const sessions = [];
+  for (const it of items) {
+    if (it.kind !== "call") continue;
+    if (it.command === "StartTransaction") {
+      sessions.push({ tx: txOf(it), conn: it.connector, start: it.t, stop: null });
+    } else if (it.command === "StopTransaction") {
+      const tx = txOf(it);
+      let s = null;
+      if (tx != null) s = sessions.findLast((x) => x.tx === tx);
+      if (!s) s = sessions.findLast((x) => x.conn === it.connector && !x.stop);
+      if (s) s.stop = it.t; else sessions.push({ tx, conn: it.connector, start: null, stop: it.t });
+    }
+  }
+  return sessions;
+}
+
+function sessionFor(it, sessions) {
+  const tx = txOf(it);
+  if (tx != null) {
+    const s = sessions.find((x) => x.tx === tx);
+    if (s) return s;
+  }
+  const cands = sessions.filter((x) => x.conn === it.connector);
+  for (const s of cands) {
+    if (s.start && it.t >= s.start && (!s.stop || it.t <= new Date(s.stop.getTime() + 120000))) return s;
+  }
+  return cands.length ? cands[cands.length - 1] : null;
+}
+
+function selectMeterValues(items, sessions, o) {
+  const keep = new Set(); const groups = new Map();
+  for (const it of items) {
+    if (it.command !== "MeterValues" || it.kind !== "call") continue;
+    const s = sessionFor(it, sessions);
+    const key = s ? "s" + sessions.indexOf(s) : "lepas:" + it.connector;
+    if (!groups.has(key)) groups.set(key, { s, list: [] });
+    groups.get(key).list.push(it);
+  }
+  const n = Math.max(1, o.count | 0);
+  const firstN = (arr, tag) => arr.slice(0, n).forEach((x) => { keep.add(x); x.anchor = x.anchor || tag; });
+  const lastN = (arr, tag) => arr.slice(-n).forEach((x) => { keep.add(x); x.anchor = x.anchor || tag; });
+
+  for (const g of groups.values()) {
+    const start = g.s && g.s.start, stop = g.s && g.s.stop, list = g.list;
+    if (o.afterStart) firstN(start ? list.filter((x) => x.t >= start) : list, "start");
+    if (o.beforeStop) {
+      if (stop) lastN(list.filter((x) => x.t <= stop), "stop");
+      else if (o.noStopTail) lastN(list, "tail");
+    }
+    if (o.afterStop && stop) firstN(list.filter((x) => x.t > stop), "after");
+  }
+  return keep;
+}
+
+/* ---------- aturan ringkas payload ---------- */
+const DEFAULT_RULES = {
+  StatusNotification: { req: "connectorId,status", res: "", mode: "hide" },
+  Authorize: { req: "idTag", res: "idTagInfo.status", mode: "arrow" },
+  StartTransaction: { req: "connectorId,meterStart", res: "transactionId", mode: "merge" },
+  StopTransaction: { req: "transactionId,meterStop,reason", res: "idTagInfo.status", mode: "arrow" },
+  MeterValues: { req: "connectorId,transactionId", res: "", mode: "hide" },
+  DataTransfer: { req: "messageId,data.Connector,data.brmVin", res: "status", mode: "hide" },
+  Heartbeat: { req: "", res: "currentTime", mode: "merge" },
+  BootNotification: { req: "chargePointVendor,chargePointModel,firmwareVersion", res: "status", mode: "arrow" },
+  Disconnect: { req: "code,reason", res: "", mode: "hide" },
+  "*": { req: "*", res: "*", mode: "arrow" },
+};
+
+function pickFields(obj, spec) {
+  if (!obj || typeof obj !== "object") return {};
+  spec = (spec || "").trim();
+  if (spec === "*") return deep(obj);
+  const out = {};
+  for (const raw of spec.split(",")) {
+    const path = raw.trim(); if (!path) continue;
+    const segs = path.split(".");
+    let src = obj, ok = true;
+    for (const s of segs) {
+      if (src != null && typeof src === "object" && s in src) src = src[s];
+      else { ok = false; break; }
+    }
+    if (!ok || src === undefined) continue;
+    let dst = out;
+    for (let i = 0; i < segs.length - 1; i++) {
+      if (typeof dst[segs[i]] !== "object" || dst[segs[i]] === null) dst[segs[i]] = {};
+      dst = dst[segs[i]];
+    }
+    dst[segs[segs.length - 1]] = deep(src);
+  }
+  return out;
+}
+
+function singleLeaf(obj) {
+  let cur = obj, guard = 0;
+  while (cur && typeof cur === "object" && !Array.isArray(cur) && Object.keys(cur).length === 1 && guard++ < 8) {
+    cur = cur[Object.keys(cur)[0]];
+  }
+  return cur !== null && typeof cur === "object" ? null : cur;
+}
+
+function shortenReasons(obj) {
+  if (!obj || typeof obj !== "object") return obj;
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    if (typeof v === "string" && (k === "reason" || k === "errorDescription")) obj[k] = v.replace(/\s*\([^()]*\)\s*$/, "").trim();
+    else if (v && typeof v === "object") shortenReasons(v);
+  }
+  return obj;
+}
+
+const CTX_LABEL = {
+  "Sample.Periodic": "Sampling", "Sample.Clock": "Clock",
+  "Transaction.Begin": "Begin", "Transaction.End": "End",
+  "Interruption.Begin": "Interruption", "Interruption.End": "Interruption",
+  Trigger: "Trigger", Other: "Other",
+};
+const DEFAULT_MEASURAND = "Energy.Active.Import.Register";
+
+function meterValuesPayload(p, o) {
+  const out = {};
+  if (p.connectorId != null) out.connectorId = p.connectorId;
+  if (p.transactionId != null) out.transactionId = p.transactionId;
+  const blocks = Array.isArray(p.meterValue) ? p.meterValue : [];
+  const mv = []; const ctxs = [];
+  for (const b of blocks) {
+    const svs = (Array.isArray(b.sampledValue) ? b.sampledValue : []).filter((sv) => o.meas.has(sv.measurand || DEFAULT_MEASURAND));
+    for (const sv of svs) if (sv.context && !ctxs.includes(sv.context)) ctxs.push(sv.context);
+    const picked = svs.map((sv) => {
+      const x = { value: sv.value, measurand: sv.measurand || DEFAULT_MEASURAND };
+      if (o.unit && sv.unit) x.unit = sv.unit;
+      return x;
+    });
+    if (o.ts) mv.push(b.timestamp ? { timestamp: b.timestamp, sampledValue: picked } : { sampledValue: picked });
+    else for (const x of picked) mv.push(x);
+  }
+  out.meterValue = mv;
+  const suffix = o.ctx && ctxs.length ? " *(" + ctxs.map((c) => CTX_LABEL[c] || c).join(", ") + ")*" : "";
+  return { obj: out, suffix };
+}
+
+function formatPayload(it, o) {
+  const rule = o.rules[it.command] || o.rules["*"];
+  const req = it.payload || {};
+  const lengkap = o.payMode === "lengkap";
+  let body, suffix = "";
+
+  if (it.kind === "result") {
+    body = lengkap ? deep(req) : pickFields(req, rule.res || "*");
+    if (!Object.keys(body).length) body = deep(req);
+  } else if (lengkap) {
+    body = deep(req);
+  } else if (it.command === "MeterValues") {
+    const r = meterValuesPayload(req, o); body = r.obj; suffix = r.suffix;
+  } else {
+    body = pickFields(req, rule.req);
+    if (o.errCode && req.errorCode && req.errorCode !== "NoError") {
+      body.errorCode = req.errorCode;
+      if (req.info) body.info = req.info;
+      if (req.vendorErrorCode) body.vendorErrorCode = req.vendorErrorCode;
+    }
+  }
+
+  let arrow = "";
+  if (it.res) {
+    const res = it.res.payload || {};
+    const resBody = lengkap ? deep(res) : pickFields(res, rule.res);
+    const mode = lengkap ? "arrow" : rule.mode;
+    if (Object.keys(resBody).length) {
+      if (mode === "merge") Object.assign(body, resBody);
+      else if (mode === "arrow") {
+        const leaf = singleLeaf(resBody);
+        arrow = leaf === null || leaf === undefined ? jsonc(resBody) : String(leaf);
+      }
+    }
+  }
+
+  if (o.shortReason) { shortenReasons(body); if (arrow) arrow = arrow.replace(/\s*\([^()]*\)\s*$/, "").trim(); }
+  const q = o.tick ? "`" : "";
+  let s = q + jsonc(body) + q;
+  if (arrow) s += " → " + q + arrow + q;
+  return s + suffix;
+}
+
+/* ---------- waktu & uuid ---------- */
+function fmtTime(t, o) {
+  const d = new Date(t.getTime() + o.tz * 60000);
+  const hms = pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()) + ":" + pad(d.getUTCSeconds());
+  if (o.timefmt === "hmsms") return hms + "." + pad(d.getUTCMilliseconds(), 3);
+  if (o.timefmt === "full") return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate()) + " " + hms;
+  return hms;
+}
+function fmtUuid(id, o) {
+  if (!id) return "-";
+  if (o.uuidMode === "full") return id;
+  return id.length > 24 ? id.slice(0, 8) + "-...-" + id.slice(-12) : id;
+}
+const KIND_OF = (c) =>
+  c === "MeterValues" ? "mv" :
+  c === "StopTransaction" || c === "Disconnect" ? "stop" :
+  c === "StartTransaction" || c === "Authorize" || c === "DataTransfer" ? "tx" : "sys";
+
+/* ---------- pipeline ---------- */
+function build(all, o) {
+  const fresh = all.map((x) => Object.assign({}, x, { res: null, anchor: null }));
+  const paired = pairMessages(fresh, o.mergeRes);
+  const sessions = buildSessions(paired);
+  const mvKeep = o.mvFilter ? selectMeterValues(paired, sessions, o.mv) : null;
+
+  const rows = []; let mvDropped = 0, hidden = 0, gap = 0;
+  for (const it of paired) {
+    const inConn = it.connector === null || o.conns.has(it.connector);
+    const tx = txOf(it);
+    const inTx = tx === null || o.txs.has(tx);
+    const inTime = (!o.from || it.t >= o.from) && (!o.to || it.t <= o.to);
+    if (!inConn || !inTx || !inTime || !o.cmds.has(it.command)) { hidden++; continue; }
+    if (mvKeep && it.command === "MeterValues" && !mvKeep.has(it)) { mvDropped++; gap++; continue; }
+    if (gap) { rows.push({ gap }); gap = 0; }
+    rows.push({
+      time: fmtTime(it.t, o),
+      uuid: fmtUuid(it.messageId, o),
+      command: it.command + (it.kind === "result" ? " ↩" : ""),
+      payload: formatPayload(it, o),
+      kind: KIND_OF(it.command),
+      anchor: it.command === "MeterValues" ? it.anchor : null,
+    });
+  }
+  if (gap) rows.push({ gap });
+  return { rows, mvDropped, hidden, sessions, messages: paired.length };
+}
+</script>
+
+<script>
+"use strict";
+/* ---------- XLSX: zip + SpreadsheetML, tanpa pustaka luar ---------- */
+const CRC_T = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[i] = c >>> 0; }
+  return t;
+})();
+function crc32(u8) { let c = 0xffffffff; for (let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+
+async function deflateRaw(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function makeZip(entries) {
+  const enc = new TextEncoder(); const parts = []; const central = []; let off = 0;
+  const DOS_DATE = 0x0021, DOS_TIME = 0;
+  for (const e of entries) {
+    const name = enc.encode(e.name);
+    const raw = typeof e.data === "string" ? enc.encode(e.data) : e.data;
+    const crc = crc32(raw);
+    let data = raw, method = 0;
+    if (typeof CompressionStream === "function") {
+      try { const d = await deflateRaw(raw); if (d.length < raw.length) { data = d; method = 8; } } catch (_) {}
+    }
+    const lh = new Uint8Array(30); const lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(6, 0, true);
+    lv.setUint16(8, method, true); lv.setUint16(10, DOS_TIME, true); lv.setUint16(12, DOS_DATE, true);
+    lv.setUint32(14, crc, true); lv.setUint32(18, data.length, true); lv.setUint32(22, raw.length, true);
+    lv.setUint16(26, name.length, true); lv.setUint16(28, 0, true);
+    parts.push(lh, name, data);
+    const ch = new Uint8Array(46); const cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true); cv.setUint16(10, method, true); cv.setUint16(12, DOS_TIME, true); cv.setUint16(14, DOS_DATE, true);
+    cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, raw.length, true);
+    cv.setUint16(28, name.length, true); cv.setUint32(42, off, true);
+    central.push(ch, name);
+    off += 30 + name.length + data.length;
+  }
+  const cdStart = off; let cdSize = 0;
+  for (const c of central) cdSize += c.length;
+  const eo = new Uint8Array(22); const ev = new DataView(eo.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, entries.length, true); ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, cdSize, true); ev.setUint32(16, cdStart, true);
+  return new Blob(parts.concat(central, [eo]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+/* Excel menolak karakter kontrol di dalam XML - buang dulu. */
+const CTRL = new RegExp("[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]", "g");
+const xe = (s) => String(s).replace(CTRL, "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const colName = (n) => { let s = ""; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; } return s; };
+
+const STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
++ '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
++ '<fonts count="4">'
++ '<font><sz val="12"/><color theme="1"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>'
++ '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>'
++ '<font><sz val="10.5"/><color theme="1"/><name val="Consolas"/><family val="3"/></font>'
++ '<font><sz val="10.5"/><color rgb="FF6F7177"/><name val="Consolas"/><family val="3"/></font>'
++ '</fonts>'
++ '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
++ '<fill><patternFill patternType="solid"><fgColor rgb="FF0C45E8"/><bgColor indexed="64"/></patternFill></fill></fills>'
++ '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>'
++ '<border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right>'
++ '<top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders>'
++ '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
++ '<cellXfs count="5">'
++ '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
++ '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>'
++ '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
++ '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
++ '<xf numFmtId="0" fontId="3" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>'
++ '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
++ '<dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium9"/></styleSheet>';
+
+function sheetXml(headers, rows, widths, styleOfCol) {
+  const last = colName(headers.length); const lastRow = rows.length + 1;
+  const out = [];
+  out.push('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
+  out.push('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">');
+  out.push('<dimension ref="A1:' + last + lastRow + '"/>');
+  out.push('<sheetViews><sheetView tabSelected="1" workbookViewId="0">');
+  out.push('<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>');
+  out.push('<selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>');
+  out.push('<sheetFormatPr baseColWidth="10" defaultRowHeight="16"/><cols>');
+  widths.forEach((w, i) => out.push('<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'));
+  out.push('</cols><sheetData><row r="1">');
+  headers.forEach((h, i) => out.push('<c r="' + colName(i + 1) + '1" s="2" t="inlineStr"><is><t>' + xe(h) + '</t></is></c>'));
+  out.push('</row>');
+  rows.forEach((r, ri) => {
+    const rn = ri + 2;
+    out.push('<row r="' + rn + '">');
+    r.forEach((v, ci) => {
+      let txt = v == null ? "" : String(v);
+      if (txt.length > 32700) txt = txt.slice(0, 32700) + "…";
+      out.push('<c r="' + colName(ci + 1) + rn + '" s="' + styleOfCol[ci] + '" t="inlineStr"><is><t xml:space="preserve">' + xe(txt) + '</t></is></c>');
+    });
+    out.push('</row>');
+  });
+  out.push('</sheetData><autoFilter ref="A1:' + last + lastRow + '"/></worksheet>');
+  return out.join("");
+}
+
+async function buildXlsx(sheetName, headers, rows, widths, styleOfCol) {
+  const safe = String(sheetName || "Log").replace(/[\\\/?*\[\]:]/g, " ").slice(0, 31) || "Log";
+  const files = [
+    { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+      + '<Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      + '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+    { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+    { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      + '<sheets><sheet name="' + xe(safe) + '" sheetId="1" r:id="rId1"/></sheets></workbook>' },
+    { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+      + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+    { name: "xl/styles.xml", data: STYLES_XML },
+    { name: "xl/worksheets/sheet1.xml", data: sheetXml(headers, rows, widths, styleOfCol) },
+  ];
+  return makeZip(files);
+}
+</script>
+
+<script>
+"use strict";
+/* ============================================================
+   UI
+   ============================================================ */
+const PREF_KEY = "pelacak-log-ocpp/v1";
+const PREVIEW_CAP = 400;
+
+const S = {
+  fileName: null, all: [], rawCount: 0,
+  commands: [], conns: [], txsFound: [], measFound: [],
+  hiddenCmds: new Set(), selConns: new Set(), selTxs: new Set(), selMeas: new Set(),
+  rules: deep(DEFAULT_RULES),
+  sessions: [], last: null, lastTz: 480,
+};
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const tzLabel = (min) => "UTC" + (min < 0 ? "-" : "+") + Math.abs(min) / 60;
+
+/* ---------- preferensi ---------- */
+function savePrefs() {
+  const p = {
+    tz: $("tzoffset").value, timefmt: $("timefmt").value, payMode: $("payMode").value, uuidMode: $("uuidMode").value,
+    tick: $("optTick").checked, mergeRes: $("optMergeRes").checked, errCode: $("optErr").checked, shortReason: $("optReason").checked,
+    mvFilter: $("mvFilter").checked, mvAfterStart: $("mvAfterStart").checked, mvBeforeStop: $("mvBeforeStop").checked,
+    mvAfterStop: $("mvAfterStop").checked, mvCount: $("mvCount").value, mvNoStopTail: $("mvNoStopTail").checked,
+    mvUnit: $("mvUnit").checked, mvTs: $("mvTs").checked, mvCtx: $("mvCtx").checked,
+    showAnchors: $("showAnchors").checked,
+    hiddenCmds: [...S.hiddenCmds], selMeas: [...S.selMeas], rules: S.rules,
+  };
+  try { localStorage.setItem(PREF_KEY, JSON.stringify(p)); } catch (_) {}
+}
+function loadPrefs() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(PREF_KEY) || "null"); } catch (_) {}
+  if (!p) return;
+  const setV = (id, v) => { if (v !== undefined && $(id)) $(id).value = v; };
+  const setC = (id, v) => { if (v !== undefined && $(id)) $(id).checked = !!v; };
+  setV("tzoffset", p.tz); setV("timefmt", p.timefmt); setV("payMode", p.payMode); setV("uuidMode", p.uuidMode);
+  setC("optTick", p.tick); setC("optMergeRes", p.mergeRes); setC("optErr", p.errCode); setC("optReason", p.shortReason);
+  setC("mvFilter", p.mvFilter); setC("mvAfterStart", p.mvAfterStart); setC("mvBeforeStop", p.mvBeforeStop);
+  setC("mvAfterStop", p.mvAfterStop); setV("mvCount", p.mvCount); setC("mvNoStopTail", p.mvNoStopTail);
+  setC("mvUnit", p.mvUnit); setC("mvTs", p.mvTs); setC("mvCtx", p.mvCtx); setC("showAnchors", p.showAnchors);
+  if (Array.isArray(p.hiddenCmds)) S.hiddenCmds = new Set(p.hiddenCmds);
+  if (Array.isArray(p.selMeas)) S.selMeas = new Set(p.selMeas);
+  if (p.rules && typeof p.rules === "object") S.rules = Object.assign(deep(DEFAULT_RULES), p.rules);
+}
+
+/* ---------- batas waktu ----------
+   Menerima "HH:MM", "HH:MM:SS", atau "YYYY-MM-DD HH:MM:SS".
+   Angka jam dibaca sebagai waktu keluaran (zona yang dipilih), bukan UTC.
+   Mengembalikan Date, null (kosong), atau undefined (tidak terbaca). */
+function parseBound(str, tz, fallback) {
+  str = (str || "").trim();
+  if (!str) return null;
+  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) - tz * 60000);
+  m = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m && fallback) {
+    const d = new Date(fallback.getTime() + tz * 60000);
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), +m[1], +m[2], +(m[3] || 0)) - tz * 60000);
+  }
+  return undefined;
+}
+
+function timeBounds(tz) {
+  const base = S.all.length ? S.all[0].t : null;
+  const fromEl = $("fromTime"), toEl = $("toTime");
+  let from = parseBound(fromEl.value, tz, base);
+  let to = parseBound(toEl.value, tz, base);
+  fromEl.classList.toggle("bad", from === undefined);
+  toEl.classList.toggle("bad", to === undefined);
+  if (from === undefined) from = null;
+  if (to === undefined) to = null;
+  // log yang melewati tengah malam: "sampai" lebih kecil dari "dari" berarti hari berikutnya
+  if (from && to && to < from && /^\d{1,2}:\d{2}(:\d{2})?$/.test(toEl.value.trim())) {
+    to = new Date(to.getTime() + 86400000);
+  }
+  return { from, to };
+}
+
+function setRange(from, to) {
+  const tz = Number($("tzoffset").value);
+  const o = { tz, timefmt: $("timefmt").value };
+  $("fromTime").value = from ? fmtTime(from, o) : "";
+  $("toTime").value = to ? fmtTime(to, o) : "";
+  refresh();
+}
+
+/* ---------- opsi aktif ---------- */
+function currentOpts() {
+  return {
+    tz: Number($("tzoffset").value), timefmt: $("timefmt").value,
+    payMode: $("payMode").value, uuidMode: $("uuidMode").value,
+    tick: $("optTick").checked, mergeRes: $("optMergeRes").checked,
+    errCode: $("optErr").checked, shortReason: $("optReason").checked,
+    rules: S.rules,
+    cmds: new Set(S.commands.map((c) => c.name).filter((n) => !S.hiddenCmds.has(n))),
+    conns: S.selConns, txs: S.selTxs,
+    ...timeBounds(Number($("tzoffset").value)),
+    mvFilter: $("mvFilter").checked,
+    mv: {
+      afterStart: $("mvAfterStart").checked, beforeStop: $("mvBeforeStop").checked,
+      afterStop: $("mvAfterStop").checked, count: Number($("mvCount").value) || 1,
+      noStopTail: $("mvNoStopTail").checked,
+    },
+    meas: S.selMeas, unit: $("mvUnit").checked, ts: $("mvTs").checked, ctx: $("mvCtx").checked,
+  };
+}
+
+/* ---------- muat file ---------- */
+const REQUIRED = ["created_at", "command"];
+
+function loadCsvText(text, name) {
+  const { headers, records } = parseCsv(text);
+  const missing = REQUIRED.filter((h) => !headers.includes(h));
+  if (missing.length) {
+    $("srcerr").hidden = false;
+    $("srcerr").textContent = "Kolom " + missing.join(" dan ") + " tidak ada di CSV ini. Yang terbaca: " + (headers.join(", ") || "(kosong)");
+    return;
+  }
+  $("srcerr").hidden = true;
+  S.fileName = name;
+  S.rawCount = records.length;
+  S.all = normalize(records);
+
+  // inventaris
+  const cc = new Map();
+  for (const it of S.all) cc.set(it.command, (cc.get(it.command) || 0) + 1);
+  S.commands = [...cc.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  S.conns = [...new Set(S.all.map((x) => x.connector).filter((x) => x !== null))].sort((a, b) => Number(a) - Number(b));
+  S.selConns = new Set(S.conns);
+
+  const paired = pairMessages(S.all.map((x) => Object.assign({}, x, { res: null })), true);
+  S.txsFound = [...new Set(paired.map(txOf).filter((x) => x !== null))].sort();
+  S.selTxs = new Set(S.txsFound);
+  S.sessions = buildSessions(paired);
+  $("fromTime").value = ""; $("toTime").value = "";
+  $("fromTime").classList.remove("bad"); $("toTime").classList.remove("bad");
+
+  const ms = new Set();
+  for (const it of S.all) {
+    const blocks = it.payload && Array.isArray(it.payload.meterValue) ? it.payload.meterValue : [];
+    for (const b of blocks) for (const sv of b.sampledValue || []) ms.add(sv.measurand || DEFAULT_MEASURAND);
+  }
+  S.measFound = [...ms].sort();
+  const keep = [...S.selMeas].filter((m) => S.measFound.includes(m));
+  S.selMeas = new Set(keep.length ? keep : S.measFound.includes(DEFAULT_MEASURAND) ? [DEFAULT_MEASURAND] : S.measFound.slice(0, 1));
+
+  // nama keluaran
+  const base = name.replace(/\.csv$/i, "") || "log-ocpp";
+  $("outname").value = base + ".xlsx";
+
+  renderSource();
+  renderScope();
+  renderCommands();
+  renderMeasurands();
+  renderRules();
+  for (const id of ["scopePanel", "cmdPanel", "mvPanel", "payPanel", "dlbar", "statstrip"]) $(id).hidden = false;
+  $("emptyState").hidden = true;
+  refresh();
+}
+
+function renderSource() {
+  if (!S.all.length) return;
+  const first = S.all[0], last = S.all[S.all.length - 1];
+  const o = currentOpts();
+  const serial = [...new Set(S.all.map((x) => x.serial).filter(Boolean))].join(", ") || "-";
+  $("srcinfo").hidden = false;
+  $("srcinfo").innerHTML =
+    '<div class="fname">' + esc(S.fileName) + "</div>" +
+    '<dl class="meta">' +
+    "<dt>Charge point</dt><dd>" + esc(serial) + "</dd>" +
+    "<dt>Rentang</dt><dd>" + (first ? fmtTime(first.t, o) + " – " + fmtTime(last.t, o) : "-") + "</dd>" +
+    "<dt>Connector</dt><dd>" + (S.conns.join(", ") || "-") + "</dd>" +
+    "<dt>Transaksi</dt><dd>" + (S.txsFound.join(", ") || "tidak ada") + "</dd>" +
+    "</dl>";
+}
+
+function chip(name, value, checked, set) {
+  const id = name + "-" + value;
+  const el = document.createElement("label");
+  el.className = "chip";
+  el.innerHTML = '<input type="checkbox" ' + (checked ? "checked" : "") + '><span>' + esc(value) + "</span>";
+  el.querySelector("input").addEventListener("change", (e) => {
+    if (e.target.checked) set.add(value); else set.delete(value);
+    refresh(); savePrefs();
+  });
+  return el;
+}
+
+function renderScope() {
+  if (!S.all.length) return;
+  const cw = $("connChips"); cw.innerHTML = "";
+  if (!S.conns.length) cw.innerHTML = '<span class="hint">tidak ada info connector</span>';
+  for (const c of S.conns) cw.appendChild(chip("conn", c, S.selConns.has(c), S.selConns));
+  const o = currentOpts();
+  const first = S.all[0], last = S.all[S.all.length - 1];
+  $("rangeHint").textContent = first
+    ? "Log tersedia " + fmtTime(first.t, o) + " sampai " + fmtTime(last.t, o) + ". Kosongkan untuk memakai semuanya."
+    : "";
+  $("rangeTx").hidden = !S.sessions.length;
+  const tw = $("txChips"); tw.innerHTML = "";
+  $("txWrap").hidden = !S.txsFound.length;
+  for (const t of S.txsFound) tw.appendChild(chip("tx", t, S.selTxs.has(t), S.selTxs));
+}
+
+function renderMeasurands() {
+  const w = $("measChips"); w.innerHTML = "";
+  if (!S.measFound.length) { w.innerHTML = '<span class="hint">tidak ada MeterValues di log ini</span>'; return; }
+  for (const m of S.measFound) w.appendChild(chip("meas", m, S.selMeas.has(m), S.selMeas));
+}
+
+function renderCommands() {
+  const w = $("cmdList"); w.innerHTML = "";
+  for (const c of S.commands) {
+    const row = document.createElement("label");
+    row.className = "cmdrow";
+    row.innerHTML = '<span class="kind k-' + KIND_OF(c.name) + '"></span>' +
+      '<input type="checkbox" ' + (S.hiddenCmds.has(c.name) ? "" : "checked") + ">" +
+      '<span class="nm">' + esc(c.name) + '</span><span class="ct">' + c.count + "</span>";
+    row.querySelector("input").addEventListener("change", (e) => {
+      if (e.target.checked) S.hiddenCmds.delete(c.name); else S.hiddenCmds.add(c.name);
+      updateCmdCount(); refresh(); savePrefs();
+    });
+    w.appendChild(row);
+  }
+  updateCmdCount();
+}
+function updateCmdCount() {
+  const shown = S.commands.filter((c) => !S.hiddenCmds.has(c.name)).length;
+  $("cmdCount").textContent = shown + "/" + S.commands.length;
+}
+
+function renderRules() {
+  const body = $("rulesBody"); body.innerHTML = "";
+  const names = [...new Set(S.commands.map((c) => c.name).concat(Object.keys(S.rules)))].filter((n) => n !== "*");
+  names.push("*");
+  for (const name of names) {
+    if (!S.rules[name]) S.rules[name] = deep(S.rules["*"]);
+    const r = S.rules[name];
+    const tr = document.createElement("tr");
+    const label = name === "*" ? "(lainnya)" : name;
+    tr.innerHTML = '<td class="cmdname">' + esc(label) + "</td>" +
+      '<td><input type="text" spellcheck="false" value="' + esc(r.req) + '"></td>' +
+      '<td><input type="text" spellcheck="false" value="' + esc(r.res) + '"></td>' +
+      '<td><span class="selwrap"><select>' +
+        '<option value="hide"' + (r.mode === "hide" ? " selected" : "") + ">sembunyikan</option>" +
+        '<option value="arrow"' + (r.mode === "arrow" ? " selected" : "") + ">panah →</option>" +
+        '<option value="merge"' + (r.mode === "merge" ? " selected" : "") + ">gabung</option>" +
+      "</select></span></td>";
+    const [reqIn, resIn] = tr.querySelectorAll("input");
+    const sel = tr.querySelector("select");
+    reqIn.addEventListener("input", () => { r.req = reqIn.value; refresh(); savePrefs(); });
+    resIn.addEventListener("input", () => { r.res = resIn.value; refresh(); savePrefs(); });
+    sel.addEventListener("change", () => { r.mode = sel.value; refresh(); savePrefs(); });
+    body.appendChild(tr);
+  }
+}
+
+/* ---------- render hasil ---------- */
+const ANCHOR_LABEL = { start: "mulai", stop: "pra-stop", after: "pasca-stop", tail: "akhir" };
+
+function headersFor(o) {
+  const h = ["Waktu (" + tzLabel(o.tz) + ")"];
+  if (o.uuidMode !== "off") h.push("UUID");
+  return h.concat(["Command", "Payload"]);
+}
+
+function refresh() {
+  if (!S.all.length) return;
+  const o = currentOpts();
+  $("mvOpts").hidden = !o.mvFilter;
+  const res = build(S.all, o);
+  S.last = { res, o };
+
+  const dataRows = res.rows.filter((r) => !r.gap);
+  $("stIn").textContent = S.rawCount;
+  $("stMsg").textContent = res.messages;
+  $("stOut").textContent = dataRows.length;
+  $("stMv").textContent = res.mvDropped;
+  $("stHide").textContent = res.hidden;
+
+  const head = headersFor(o);
+  $("previewHead").innerHTML = head.map((h) => "<th>" + esc(h) + "</th>").join("");
+  const showAnchors = $("showAnchors").checked;
+  const withUuid = o.uuidMode !== "off";
+  const cols = head.length;
+
+  const frag = document.createDocumentFragment();
+  let shown = 0;
+  for (const r of res.rows) {
+    if (shown >= PREVIEW_CAP) break;
+    const tr = document.createElement("tr");
+    if (r.gap) {
+      tr.className = "gaprow";
+      tr.innerHTML = '<td colspan="' + cols + '">' + "⋯ " + r.gap + " MeterValues disembunyikan</td>";
+      frag.appendChild(tr); continue;
+    }
+    shown++;
+    if (r.anchor) tr.className = "anchor";
+    let html = '<td class="t-time">' + esc(r.time) + "</td>";
+    if (withUuid) html += '<td class="t-uuid">' + esc(r.uuid) + "</td>";
+    html += '<td class="t-cmd"><span class="dot k-' + r.kind + '"></span>' + esc(r.command);
+    if (r.anchor && showAnchors) {
+      const cls = r.anchor === "stop" || r.anchor === "after" ? " s" : "";
+      html += '<span class="anchortag' + cls + '">' + ANCHOR_LABEL[r.anchor] + "</span>";
+    }
+    html += "</td>";
+    html += '<td class="t-pay">' + esc(r.payload).replace(/ → /g, '<span class="arrow">→</span>').replace(/(\*\([^)]*\)\*)/g, '<span class="tag">$1</span>') + "</td>";
+    tr.innerHTML = html;
+    frag.appendChild(tr);
+  }
+  const body = $("previewBody"); body.innerHTML = ""; body.appendChild(frag);
+  $("emptyState").hidden = dataRows.length > 0;
+  if (!dataRows.length) {
+    $("emptyState").innerHTML = '<div class="big">Tidak ada baris yang lolos filter</div><div>Nyalakan kembali sebagian command atau connector di panel kiri.</div>';
+  }
+  $("previewNote").textContent = dataRows.length > PREVIEW_CAP
+    ? "pratinjau " + PREVIEW_CAP + " dari " + dataRows.length + " baris — unduhan memuat semuanya"
+    : dataRows.length + " baris";
+  const sheetName = ($("outname").value || "").replace(/\.xlsx$/i, "");
+  $("sheetTitle").textContent = sheetName ? "Pratinjau · " + sheetName : "Pratinjau hasil";
+}
+
+/* ---------- unduh ---------- */
+async function download() {
+  if (!S.last) return;
+  const { res, o } = S.last;
+  const withUuid = o.uuidMode !== "off";
+  const head = headersFor(o);
+  const rows = res.rows.filter((r) => !r.gap).map((r) => withUuid ? [r.time, r.uuid, r.command, r.payload] : [r.time, r.command, r.payload]);
+  if (!rows.length) { toast("Belum ada baris untuk diunduh"); return; }
+  const widths = withUuid ? [13.83, 25.83, 18.83, 100] : [13.83, 18.83, 100];
+  const styles = withUuid ? [1, 4, 1, 3] : [1, 1, 3];
+  let fname = ($("outname").value || "log-ocpp").trim();
+  if (!/\.xlsx$/i.test(fname)) fname += ".xlsx";
+  const btn = $("dlbtn"); btn.disabled = true; btn.textContent = "Menyusun…";
+  try {
+    const blob = await buildXlsx(fname.replace(/\.xlsx$/i, ""), head, rows, widths, styles);
+    const saved = await saveFile(blob, fname);
+    if (saved) toast(rows.length + " baris tersimpan ke " + fname);
+  } catch (err) {
+    toast(err && err.code === "declined" ? "Unduhan dibatalkan" : "Gagal menyimpan: " + (err.message || err));
+  } finally {
+    btn.disabled = false; btn.textContent = "Unduh XLSX";
+  }
+}
+
+/* Di viewer Artifact, halaman tidak boleh mengunduh sendiri - file diserahkan
+   lewat capability downloads. Dibuka langsung dari file lokal, jatuh kembali
+   ke tautan blob biasa. */
+async function saveFile(blob, fname) {
+  let dl = null;
+  try {
+    if (window.claude && typeof window.claude.use === "function") dl = await window.claude.use("downloads");
+  } catch (_) { dl = null; }
+  if (dl) {
+    await dl.save({ filename: fname, data: blob });
+    return true;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return true;
+}
+
+/* ---------- wiring ---------- */
+function readFile(file) {
+  if (!file) return;
+  const rd = new FileReader();
+  rd.onload = () => loadCsvText(String(rd.result), file.name);
+  rd.onerror = () => { $("srcerr").hidden = false; $("srcerr").textContent = "File tidak bisa dibaca."; };
+  rd.readAsText(file, "utf-8");
+}
+
+const dz = $("dropzone");
+dz.addEventListener("click", () => $("fileinput").click());
+dz.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("fileinput").click(); } });
+$("fileinput").addEventListener("change", (e) => readFile(e.target.files[0]));
+["dragenter", "dragover"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("over"); }));
+dz.addEventListener("drop", (e) => readFile(e.dataTransfer.files[0]));
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => e.preventDefault());
+
+for (const id of ["tzoffset", "timefmt", "payMode", "uuidMode", "optTick", "optMergeRes", "optErr", "optReason",
+  "mvFilter", "mvAfterStart", "mvBeforeStop", "mvAfterStop", "mvCount", "mvNoStopTail",
+  "mvUnit", "mvTs", "mvCtx", "showAnchors"]) {
+  $(id).addEventListener("change", () => {
+    if (id === "tzoffset") {
+      // batas yang sudah diketik dibaca ulang di zona lama, lalu ditulis ulang di zona baru
+      const b = timeBounds(S.lastTz);
+      S.lastTz = Number($("tzoffset").value);
+      setRange(b.from, b.to);
+    }
+    if (id === "tzoffset" || id === "timefmt") { renderSource(); renderScope(); }
+    refresh(); savePrefs();
+  });
+}
+for (const id of ["fromTime", "toTime"]) $(id).addEventListener("input", () => refresh());
+$("rangeAll").addEventListener("click", () => setRange(null, null));
+$("rangeTx").addEventListener("click", () => {
+  const sel = S.sessions.filter((x) => x.tx === null || S.selTxs.has(x.tx));
+  const starts = sel.map((x) => x.start).filter(Boolean);
+  const stops = sel.map((x) => x.stop).filter(Boolean);
+  if (!starts.length && !stops.length) { toast("Tidak ada StartTransaction di log ini"); return; }
+  const from = starts.length ? new Date(Math.min(...starts.map((d) => d.getTime()))) : null;
+  const to = stops.length ? new Date(Math.max(...stops.map((d) => d.getTime())) + 60000) : (S.all.length ? S.all[S.all.length - 1].t : null);
+  setRange(from ? new Date(from.getTime() - 30000) : null, to);
+});
+$("outname").addEventListener("input", () => refresh());
+$("dlbtn").addEventListener("click", download);
+
+document.querySelectorAll(".minibtn[data-preset]").forEach((b) => b.addEventListener("click", () => {
+  const p = b.dataset.preset;
+  if (p === "all") S.hiddenCmds = new Set();
+  else if (p === "none") S.hiddenCmds = new Set(S.commands.map((c) => c.name));
+  else S.hiddenCmds = new Set(["Heartbeat"]);
+  renderCommands(); refresh(); savePrefs();
+}));
+$("rulesReset").addEventListener("click", () => { S.rules = deep(DEFAULT_RULES); renderRules(); refresh(); savePrefs(); });
+
+/* tinggi topbar dipakai rail agar panel kiri bisa digulir sendiri */
+function syncTopH() {
+  const h = document.querySelector(".topbar").offsetHeight;
+  document.documentElement.style.setProperty("--topH", h + "px");
+}
+syncTopH();
+window.addEventListener("resize", syncTopH);
+
+loadPrefs();
+S.lastTz = Number($("tzoffset").value);
+$("mvOpts").hidden = !$("mvFilter").checked;
+</script>
+
+</body>
+</html>
